@@ -23,14 +23,14 @@ public class NativeServer implements Runnable{
     private static final byte[] SERVER_VERSION = "0.0.1(beta)".getBytes();
     private static final byte[] DEFAULT_AUTH_PLUGIN_NAME = "mysql_native_password".getBytes();
     public static final int DEFAULT_CAPABILITY_FLAGS = CLIENT_LONG_PASSWORD | CLIENT_FOUND_ROWS | CLIENT_LONG_FLAG | CLIENT_NO_SCHEMA | CLIENT_IGNORE_SPACE
-            | CLIENT_PROTOCOL_41 | CLIENT_INTERACTIVE | CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA | CLIENT_SECURE_CONNECTION
+            | CLIENT_PROTOCOL_41 | CLIENT_INTERACTIVE | CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA | CLIENT_SECURE_CONNECTION;
             // ignoring column eof
-            | CLIENT_DEPRECATE_EOF ;
+//            | CLIENT_DEPRECATE_EOF ;
     /**
      * mysql_native_password 鉴权使用的最小客户端兼容
      */
     private static final int MIN_CLIENT_FLAGS = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_PROTOCOL_41  | CLIENT_SECURE_CONNECTION |
-            CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA | CLIENT_DEPRECATE_EOF ;
+            CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA  ;
 
     // 字符集和整理集都可以用255
     public static final byte DEFAULT_CHARSET = (byte) Charset.UTF_8;
@@ -78,7 +78,7 @@ public class NativeServer implements Runnable{
                     payload.readBytes(StringLengthDataType.STRING_FIXED, 1);
                     System.out.println(payload.readString(StringSelfDataType.STRING_TERM, "UTF-8"));
                     System.out.println("query package recv");
-                    writeDummyTable(payload.getSequenceId(), 5);
+                    writeDummyTable(payload.getSequenceId(), RANDOM_GENERATOR.nextInt(20) + 1);
                 }else{
                     System.out.println(payload.dumpAsHex());
                 }
@@ -124,17 +124,18 @@ public class NativeServer implements Runnable{
             // 0x1f for dynamic strings, double, float
             // 0x00 to 0x51 for decimals
             payload.writeInteger(IntegerDataType.INT1, 0);
-
-            // note currently there are still remain 2 bytes.
-            // WHY!!!
+            /*
+             * note currently there are still remain 2 bytes.
+             * see mysql-server/sql/protocol_classic.cc:3337
+             * pos[10] = 0;  // For the future
+             * pos[11] = 0;  // For the future
+             **/
             payload.writeInteger(IntegerDataType.INT1, 0);
             payload.writeInteger(IntegerDataType.INT1, 0);
-            //System.out.println(payload.dumpAsHex());
-
             payload.writePackage(out);
         }
-
-        for (int i = 0; i < 1; ++i){
+        writeEOFPacket(++sequenceId,0,0);
+        for (int i = 0, len = RANDOM_GENERATOR.nextInt(10) - 1; i < len; ++i){
             Payload payload = new Payload(128, ++sequenceId);
             for(int j = 0; j < n; ++j){
                 payload.writeBytes(StringSelfDataType.STRING_LENENC, ("dummy" + i + j).getBytes());
@@ -143,7 +144,7 @@ public class NativeServer implements Runnable{
             payload.writePackage(out);
         }
         //SERVER_STATUS_LAST_ROW_SENT
-        writeEOFPacket(++sequenceId, 0, 0);
+        writeEOFPacket(++sequenceId,0,0);
     }
     //
     private void handshake() throws IOException {
@@ -223,7 +224,7 @@ public class NativeServer implements Runnable{
     }
 
     private void writeEOFPacket(int sequenceId, int warnings, int flags) throws IOException{
-        Payload packet = new Payload(64, sequenceId);
+        Payload packet = new Payload(32, sequenceId);
         packet.writeInteger(IntegerDataType.INT1, 0xfe);
         packet.writeInteger(IntegerDataType.INT2, warnings);
         packet.writeInteger(IntegerDataType.INT2, flags);

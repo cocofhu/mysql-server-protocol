@@ -315,9 +315,9 @@ public class Payload {
     /** Pack this packet as bytes array. it will return the copy of underlying bytes. */
     private byte[] toBytes(){
         byte[] headerBytes = new byte[]{
-                (byte) ( payloadLength & 255),
-                (byte) ((payloadLength / 255) & 255),
-                (byte) ((payloadLength / 255 / 255) & 255),
+                (byte) ( position & 255),
+                (byte) ((position / 255) & 255),
+                (byte) ((position / 255 / 255) & 255),
                 (byte) sequenceId
         };
         byte[] messageBytes = byteBuffer;
